@@ -19,9 +19,13 @@ A license file for MuJoCo (mjkey.txt) is required to run the simulation. The lib
 
 To build and run the examples:
 1.  Place mjkey.txt in the `.mujoco`directory
-2.  Set the `MUJOCO_KEY_PATH` environment variable to be `~/.mujoco/mjkey.txt`
-3.  (Optional) Set the `CASSIE_MODEL_PATH` environment variable to be `<where you cloned this repository>/model/cassie.xml`
-4.  `make test`
+2.  Add the following two lines to your `~/.bashrc` file, making any changes to paths as appropriate
+    ```
+    export MUJOCO_KEY_PATH=/home/<your account>/.mujoco/mjkey.txt
+    export CASSIE_MODEL_PATH=<your workspace directory>/cassie-mujoco-sim/model/cassie.xml
+    ```
+    Note that the "PATH" variables should point to files, not directories.
+4.  `make test` 
 5.  Run the examples in the test directory
 
 The examples include cassiesim, which simulates a physical Cassie robot controlled over UDP, and cassiectrl, a null controller operating over UDP. The file cassietest.c is a minimal example of running the simulation, and cassietest.py demonstrates controlling the simulated robot in Python.
