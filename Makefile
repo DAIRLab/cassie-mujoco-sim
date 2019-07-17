@@ -14,7 +14,7 @@ LIBOUT := cassiemujoco.dll
 else
 CC     := gcc
 CFLAGS += -fPIC
-LIBS   := -lm -ldl -Wl,--whole-archive -lagilitycassie -Wl,--no-whole-archive
+LIBS   := -llcm -lm -ldl -Wl,--whole-archive -lagilitycassie -Wl,--no-whole-archive
 LIBOUT := libcassiemujoco.so
 endif
 
