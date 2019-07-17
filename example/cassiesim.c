@@ -21,8 +21,12 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <arpa/inet.h>
+#include <lcm/lcm.h>
 #include "cassiemujoco.h"
 #include "udp.h"
+#include "dairlib_lcmt_cassie_out.h"
+#include "udp_lcm_translator.h"
 
 
 enum mode {
@@ -56,6 +60,9 @@ static long long get_microseconds(void)
 
 int main(int argc, char *argv[])
 {
+    // LCM
+    lcm_t *lcm = lcm_create(NULL);
+
     // Option variables and flags
     char *iface_addr_str = "0.0.0.0";
     char *iface_port_str = "25000";
@@ -168,6 +175,11 @@ int main(int argc, char *argv[])
     struct sockaddr_storage src_addr = {0};
     socklen_t addrlen = sizeof src_addr;
 
+    struct sockaddr_in remoteaddr;
+    remoteaddr.sin_family = AF_INET;
+    remoteaddr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    remoteaddr.sin_port = htons(25001);
+
     // Create cassie simulation
     cassie_sim_t *sim = cassie_sim_init();
     cassie_vis_t *vis;
@@ -194,7 +206,7 @@ int main(int argc, char *argv[])
     long long send_time = get_microseconds();
     long long recv_time = get_microseconds();
 
-    printf("Waiting for input...\n");
+    run_sim = true;
 
     // Listen/respond loop
     while (true) {
@@ -214,8 +226,8 @@ int main(int argc, char *argv[])
         if (recvlen == nbytes) {
             // Process incoming header and write outgoing header
             process_packet_header(&header_info, header_in, header_out);
-            printf("\033[F\033[Jdelay: %d, diff: %d\n",
-                   header_info.delay, header_info.seq_num_in_diff);
+            // printf("\033[F\033[Jdelay: %d, diff: %d\n",
+                   // header_info.delay, header_info.seq_num_in_diff);
 
             // Unpack received data into cassie user input struct
             switch (mode) {
@@ -273,7 +285,12 @@ int main(int argc, char *argv[])
 
             // Send response
             send_packet(sock, sendbuf, sendlen,
-                        (struct sockaddr *) &src_addr, addrlen);
+                        (struct sockaddr *) &remoteaddr, addrlen);
+            // Send LCM response
+            dairlib_lcmt_cassie_out message;
+            double time = *cassie_sim_time(sim);
+            cassieOutToLcm(&cassie_out, time, &message);
+            dairlib_lcmt_cassie_out_publish(lcm, "CASSIE_OUTPUT", &message);
         }
 
         // Draw no more then once every 33 simulation steps

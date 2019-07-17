@@ -5,7 +5,7 @@ PLATFORM := LINUX
 INC     := -Iinclude
 CFLAGS  := -std=gnu11 -Wall -Wextra -O3 -march=sandybridge -flto
 LDFLAGS := -L.
-LIBS    := -lcassiemujoco
+LIBS    := -llcm -lcassiemujoco
 
 # Platform-specific settings
 ifeq ($(PLATFORM), WIN)
