@@ -2,7 +2,7 @@
 PLATFORM := LINUX
 
 # Compilation settings
-INC     := -Iinclude
+INC     := -Iinclude -I${LCM_INSTALL_DIR}/include -L${LCM_INSTALL_DIR}/lib
 CFLAGS  := -std=gnu11 -Wall -Wextra -O3 -march=sandybridge -flto
 LDFLAGS := -L.
 LIBS    := -llcm -lcassiemujoco

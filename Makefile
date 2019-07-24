@@ -2,7 +2,7 @@
 PLATFORM := LINUX
 
 # Compilation settings
-INC     := -Iinclude -I$${HOME}/.mujoco/mujoco200_linux/include
+INC     := -Iinclude -I$${HOME}/.mujoco/mujoco200_linux/include -I${LCM_INSTALL_DIR}/include -L${LCM_INSTALL_DIR}/lib
 CFLAGS  := -std=gnu11 -Wall -Wextra -O3 -march=sandybridge -flto
 LDFLAGS := -shared -Lsrc
 
