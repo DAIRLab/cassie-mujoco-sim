@@ -26,7 +26,9 @@
 #include "cassiemujoco.h"
 #include "udp.h"
 #include "dairlib_lcmt_cassie_out.h"
+#include "dairlib_lcmt_robot_output.h"
 #include "udp_lcm_translator.h"
+#include "pack_robot_out.h"
 
 
 enum mode {
@@ -69,13 +71,14 @@ int main(int argc, char *argv[])
     bool realtime = false;
     bool visualize = false;
     bool hold = false;
+    bool state_pub = false;
     char *log_file_path = NULL;
     char *qlog_file_path = NULL;
     int mode = MODE_STANDARD;
 
     // Parse arguments
     int c;
-    while ((c = getopt(argc, argv, "a:p:rvhl:q:x")) != -1) {
+    while ((c = getopt(argc, argv, "a:p:rvhsl:q:x")) != -1) {
         switch (c) {
         case 'a':
             // Inteface address to bind
@@ -109,6 +112,10 @@ int main(int argc, char *argv[])
             // Run in PD mode
             mode = MODE_PD;
             break;
+        case 's':
+            // Publish state via LCM
+            state_pub = true;
+            break;
         default:
             // Print usage
             printf(
@@ -122,6 +129,7 @@ int main(int argc, char *argv[])
 "  -h             Hold the pelvis in place.\n"
 "  -l [FILENAME]  Log the input and output UDP data to a file.\n"
 "  -q [FILENAME]  Log simulation time, qpos, and qvel to a file.\n"
+"  -s             Publish the full state via LCM on CASSIE_STATE channel. \n"
 "  -x             Run in PD mode, taking PD targets and sending state estimates.\n"
 "\n"
 "By default, the simulator listens on all IPv4 interfaces at port %s.\n"
@@ -207,6 +215,95 @@ int main(int argc, char *argv[])
     long long send_time = get_microseconds();
     long long recv_time = get_microseconds();
 
+    // Create robot_output lcm message
+    dairlib_lcmt_robot_output robot_output_message;
+    double position[23];
+    robot_output_message.position = position;
+    robot_output_message.position_names =
+        (char**) lcm_malloc(sizeof(char*) * 23);
+    double velocity[22];
+    robot_output_message.velocity = velocity;
+    robot_output_message.velocity_names =
+        (char**) lcm_malloc(sizeof(char*) * 22);
+    double effort[10];
+    robot_output_message.effort = effort;
+    robot_output_message.effort_names =
+        (char**) lcm_malloc(sizeof(char*) * 10);
+
+    int qoffset = 0;
+    int voffset = 0;
+
+    if(!hold) {
+        robot_output_message.position_names[0] = "base_x";
+        robot_output_message.position_names[1] = "base_y";
+        robot_output_message.position_names[2] = "base_z";
+        robot_output_message.position_names[3] = "base_qw";
+        robot_output_message.position_names[4] = "base_qx";
+        robot_output_message.position_names[5] = "base_qy";
+        robot_output_message.position_names[6] = "base_qz";
+
+        robot_output_message.velocity_names[0] = "base_vx";
+        robot_output_message.velocity_names[1] = "base_vy";
+        robot_output_message.velocity_names[2] = "base_vz";
+        robot_output_message.velocity_names[3] = "base_wx";
+        robot_output_message.velocity_names[4] = "base_wy";
+        robot_output_message.velocity_names[5] = "base_wz";
+
+        qoffset = 7;
+        voffset = 6;
+    }
+    robot_output_message.num_positions = 16 + qoffset;
+    robot_output_message.num_velocities = 16 + voffset;
+
+    robot_output_message.position_names[qoffset] = "hip_roll_left";
+    robot_output_message.position_names[qoffset + 1] = "hip_yaw_left";
+    robot_output_message.position_names[qoffset + 2] = "hip_pitch_left";
+    robot_output_message.position_names[qoffset + 3] = "knee_left";
+    robot_output_message.position_names[qoffset + 4] = "toe_left";
+    robot_output_message.position_names[qoffset + 5] = "knee_joint_left";
+    robot_output_message.position_names[qoffset + 6] = "ankle_joint_left";
+    robot_output_message.position_names[qoffset + 7] =
+            "ankle_spring_joint_left";
+    robot_output_message.position_names[qoffset + 8] = "hip_roll_right";
+    robot_output_message.position_names[qoffset + 9] = "hip_yaw_right";
+    robot_output_message.position_names[qoffset + 10] = "hip_pitch_right";
+    robot_output_message.position_names[qoffset + 11] = "knee_right";
+    robot_output_message.position_names[qoffset + 12] = "toe_right";
+    robot_output_message.position_names[qoffset + 13] = "knee_joint_right";
+    robot_output_message.position_names[qoffset + 14] = "ankle_joint_right";
+    robot_output_message.position_names[qoffset + 15] =
+            "ankle_spring_joint_right";
+
+    robot_output_message.velocity_names[voffset] = "hip_roll_leftdot";
+    robot_output_message.velocity_names[voffset + 1] = "hip_yaw_leftdot";
+    robot_output_message.velocity_names[voffset + 2] = "hip_pitch_leftdot";
+    robot_output_message.velocity_names[voffset + 3] = "knee_leftdot";
+    robot_output_message.velocity_names[voffset + 4] = "toe_leftdot";
+    robot_output_message.velocity_names[voffset + 5] = "knee_joint_leftdot";
+    robot_output_message.velocity_names[voffset + 6] = "ankle_joint_leftdot";
+    robot_output_message.velocity_names[voffset + 7] =
+            "ankle_spring_joint_leftdot";
+    robot_output_message.velocity_names[voffset + 8] = "hip_roll_rightdot";
+    robot_output_message.velocity_names[voffset + 9] = "hip_yaw_rightdot";
+    robot_output_message.velocity_names[voffset + 10] = "hip_pitch_rightdot";
+    robot_output_message.velocity_names[voffset + 11] = "knee_rightdot";
+    robot_output_message.velocity_names[voffset + 12] = "toe_rightdot";
+    robot_output_message.velocity_names[voffset + 13] = "knee_joint_rightdot";
+    robot_output_message.velocity_names[voffset + 14] = "ankle_joint_rightdot";
+    robot_output_message.velocity_names[voffset + 15] =
+            "ankle_spring_joint_rightdot";
+
+    robot_output_message.num_efforts = 10;
+    robot_output_message.effort_names[0] = "hip_roll_left_motor";
+    robot_output_message.effort_names[1] = "hip_yaw_left_motor";
+    robot_output_message.effort_names[2] = "hip_pitch_left_motor";
+    robot_output_message.effort_names[3] = "knee_left_motor";
+    robot_output_message.effort_names[4] = "toe_left_motor";
+    robot_output_message.effort_names[5] = "hip_roll_right_motor";
+    robot_output_message.effort_names[6] = "hip_yaw_right_motor";
+    robot_output_message.effort_names[7] = "hip_pitch_right_motor";
+    robot_output_message.effort_names[8] = "knee_right_motor";
+    robot_output_message.effort_names[9] = "toe_right_motor";
     run_sim = true;
 
     // Listen/respond loop
@@ -292,6 +389,14 @@ int main(int argc, char *argv[])
             double time = *cassie_sim_time(sim);
             cassieOutToLcm(&cassie_out, time, &message);
             dairlib_lcmt_cassie_out_publish(lcm, "CASSIE_OUTPUT", &message);
+
+            if (state_pub) {
+                pack_robot_out_vectors(&robot_output_message, sim, &cassie_out,
+                    hold);
+                robot_output_message.utime = (int64_t) (time * 1.0e6);
+                dairlib_lcmt_robot_output_publish(lcm, "CASSIE_STATE",
+                        &robot_output_message);
+            }
         }
 
         // Draw no more then once every 33 simulation steps
