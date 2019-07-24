@@ -9,7 +9,7 @@ To build the shared library:
 2.  Clone this repository
 3.  Download mjpro200_linux.zip from roboti.us
 4.  Put mjpro200_linux in a `.mujoco` directory in your home directory
-5.  LCM must be installed (if you used apt install via Drake, it will be in `/opt/lcm/<version>`). The install path must be set to build against LCM
+5.  LCM must be installed (if you used apt install via Drake, it will be in `/opt/lcm/<version>`). If LCM is not installed to a system location (e.g. `/usr/local`), the install path must be set to build against LCM
   ```
   export LCM_INSTALL_DIR=<path to lcm>
   ```
