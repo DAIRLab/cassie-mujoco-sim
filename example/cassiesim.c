@@ -27,6 +27,7 @@
 #include "udp.h"
 #include "dairlib_lcmt_cassie_out.h"
 #include "dairlib_lcmt_robot_output.h"
+#include "dairlib_lcmt_cassie_mujoco_contact.h"
 #include "udp_lcm_translator.h"
 #include "pack_robot_out.h"
 
@@ -233,6 +234,12 @@ int main(int argc, char *argv[])
     int qoffset = 0;
     int voffset = 0;
 
+    // Create contact_force lcm message
+    dairlib_lcmt_cassie_mujoco_contact cassie_mujoco_contact;
+    double contact_forces[12];
+    cassie_mujoco_contact.contact_forces = contact_forces;
+    cassie_mujoco_contact.num_contact_forces = 12;
+
     if(!hold) {
         robot_output_message.position_names[0] = "base_x";
         robot_output_message.position_names[1] = "base_y";
@@ -349,10 +356,12 @@ int main(int argc, char *argv[])
             case MODE_PD:
                 cassie_sim_step_pd(sim, &state_out, &pd_in);
                 pack_state_out_t(&state_out, data_out);
-                break;
+                cassie_sim_foot_forces(sim, &contact_forces);
+              break;
             default:
                 cassie_sim_step(sim, &cassie_out, &cassie_user_in);
                 pack_cassie_out_t(&cassie_out, data_out);
+                cassie_sim_foot_forces(sim, &contact_forces);
             }
 
             // Log Cassie input/output
@@ -394,8 +403,11 @@ int main(int argc, char *argv[])
                 pack_robot_out_vectors(&robot_output_message, sim, &cassie_out,
                     hold);
                 robot_output_message.utime = (int64_t) (time * 1.0e6);
+                cassie_mujoco_contact.utime = (int64_t) (time * 1.0e6);
                 dairlib_lcmt_robot_output_publish(lcm, "CASSIE_STATE",
                         &robot_output_message);
+                dairlib_lcmt_cassie_mujoco_contact_publish(lcm, "CASSIE_CONTACT",
+                                                         &cassie_mujoco_contact);
             }
         }
 
