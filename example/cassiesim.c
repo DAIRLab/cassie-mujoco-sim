@@ -406,7 +406,7 @@ int main(int argc, char *argv[])
                 cassie_mujoco_contact.utime = (int64_t) (time * 1.0e6);
                 dairlib_lcmt_robot_output_publish(lcm, "CASSIE_STATE",
                         &robot_output_message);
-                dairlib_lcmt_cassie_mujoco_contact_publish(lcm, "CASSIE_CONTACT",
+                dairlib_lcmt_cassie_mujoco_contact_publish(lcm, "CASSIE_CONTACT_MUJOCO",
                                                          &cassie_mujoco_contact);
             }
         }
