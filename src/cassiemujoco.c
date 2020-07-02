@@ -70,6 +70,8 @@ mjvFigure figsensor;
     X(mj_copyData)                              \
     X(mj_deleteData)                            \
     X(mj_forward)                               \
+    X(mj_fullM)                                 \
+    X(mj_getTotalmass)                          \
     X(mj_step1)                                 \
     X(mj_step2)                                 \
     X(mj_step)                                  \
@@ -873,6 +875,8 @@ cassie_sim_t *cassie_sim_init(const char* modelfile)
     mju_copy_fp(&c->d->qpos[7], qpos_init, 28);
     mj_forward_fp(c->m, c->d);
 
+    print_inertia_matrix(c);
+
     // Intialize systems
     cassie_core_sim_setup(c->core);
     state_output_setup(c->estimator);
@@ -1033,6 +1037,23 @@ void *cassie_sim_mjmodel(cassie_sim_t *c)
 void *cassie_sim_mjdata(cassie_sim_t *c)
 {
     return c->d;
+}
+
+void print_inertia_matrix(cassie_sim_t *c)
+{
+    printf("Initial position: \n");
+    double* pos = cassie_sim_qpos(c);
+    mju_printMat_fp(pos, c->m->nq, 1);
+
+    double inertia[c->m->nv * c->m->nv];
+    mj_fullM_fp(c->m, inertia, c->d->qM);
+    printf("Inertia matrix: ");
+    mju_printMat_fp(inertia, c->m->nv, c->m->nv);
+
+    double mass = mj_getTotalmass_fp(c->m);
+    printf("Total mass: %f\n", mass);
+
+    printf("nM: %d\n", c->m->nM);
 }
 
 

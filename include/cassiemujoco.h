@@ -163,6 +163,9 @@ void *cassie_sim_mjmodel(cassie_sim_t *sim);
 // Returns the mjData* used by the simulator
 void *cassie_sim_mjdata(cassie_sim_t *sim);
 
+// Print the current inertia matrix
+void print_inertia_matrix(cassie_sim_t *sim);
+
 // Returns true if any of the collision bodies in Cassie are in
 // contact with an object with the obstacle class.
 bool cassie_sim_check_obstacle_collision(const cassie_sim_t *sim);

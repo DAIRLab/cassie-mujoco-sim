@@ -27,7 +27,7 @@
 #include "udp.h"
 #include "dairlib_lcmt_cassie_out.h"
 #include "dairlib_lcmt_robot_output.h"
-#include "dairlib_lcmt_cassie_mujoco_contact.h"
+#include "dairlib_lcmt_contact_mujoco.h"
 #include "udp_lcm_translator.h"
 #include "pack_robot_out.h"
 
@@ -191,6 +191,7 @@ int main(int argc, char *argv[])
 
     // Create cassie simulation
     const char modelfile[] = "../model/cassie.xml";
+    // const char modelfile[] = "/home/yangwill/workspace/dairlib/examples/Cassie/urdf/cassie_v2.urdf";
     cassie_sim_t *sim = cassie_sim_init(modelfile);
     cassie_vis_t *vis;
     if (visualize)
@@ -211,7 +212,8 @@ int main(int argc, char *argv[])
     // Manage simulation loop
     unsigned long long loop_counter = 0;
     bool run_sim = false;
-    const long long cycle_usec = 1000000 / 2000;
+    double realtime_rate = 0.5;
+    const long long cycle_usec = 1000000 / (2000 * realtime_rate);
     const long long timeout_usec = mode == MODE_PD ? 100000 : 10000;
     long long send_time = get_microseconds();
     long long recv_time = get_microseconds();
@@ -235,15 +237,16 @@ int main(int argc, char *argv[])
     int voffset = 0;
 
     // Create contact_force lcm message
-    dairlib_lcmt_cassie_mujoco_contact cassie_mujoco_contact;
+    dairlib_lcmt_contact_mujoco cassie_mujoco_contact;
     double contact_forces[12];
     cassie_mujoco_contact.contact_forces = contact_forces;
     cassie_mujoco_contact.num_contact_forces = 12;
 
     if(!hold) {
+        // Although this is different than the ordering of MBP, state receiver will rearrange accordingly
         robot_output_message.position_names[0] = "base_x";
         robot_output_message.position_names[1] = "base_y";
-        robot_output_message.position_names[2] = "base_z";
+        robot_output_message.position_names[2] = "base_z";        
         robot_output_message.position_names[3] = "base_qw";
         robot_output_message.position_names[4] = "base_qx";
         robot_output_message.position_names[5] = "base_qy";
@@ -356,13 +359,15 @@ int main(int argc, char *argv[])
             case MODE_PD:
                 cassie_sim_step_pd(sim, &state_out, &pd_in);
                 pack_state_out_t(&state_out, data_out);
-                cassie_sim_foot_forces(sim, &contact_forces);
+                cassie_sim_foot_forces(sim, contact_forces);
               break;
             default:
                 cassie_sim_step(sim, &cassie_out, &cassie_user_in);
                 pack_cassie_out_t(&cassie_out, data_out);
-                cassie_sim_foot_forces(sim, &contact_forces);
+                cassie_sim_foot_forces(sim, contact_forces);
             }
+
+            // print_inertia_matrix(sim);
 
             // Log Cassie input/output
             if (log_file) {
@@ -404,9 +409,9 @@ int main(int argc, char *argv[])
                     hold);
                 robot_output_message.utime = (int64_t) (time * 1.0e6);
                 cassie_mujoco_contact.utime = (int64_t) (time * 1.0e6);
-                dairlib_lcmt_robot_output_publish(lcm, "CASSIE_STATE",
+                dairlib_lcmt_robot_output_publish(lcm, "CASSIE_STATE_SIMULATION",
                         &robot_output_message);
-                dairlib_lcmt_cassie_mujoco_contact_publish(lcm, "CASSIE_CONTACT_MUJOCO",
+                dairlib_lcmt_contact_mujoco_publish(lcm, "CASSIE_CONTACT_MUJOCO",
                                                          &cassie_mujoco_contact);
             }
         }
