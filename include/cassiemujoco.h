@@ -24,6 +24,8 @@
 #include "state_out_t.h"
 #include "pd_in_t.h"
 
+#include "drake_lcmt_contact_results_for_viz.h"
+#include "drake_lcmt_point_pair_contact_info_for_viz.h"
 
 typedef struct cassie_sim cassie_sim_t;
 typedef struct cassie_vis cassie_vis_t;
@@ -180,6 +182,9 @@ bool cassie_sim_check_self_collision(const cassie_sim_t *sim);
 // cfrc[6-8]:  Contact force acting on the left foot, in world coordinates
 // cfrc[9-11]: Currently zero, reserved for torque acting on the right foot
 void cassie_sim_foot_forces(const cassie_sim_t *c, double cfrc[12]);
+
+// Returns the contact forces in the drake_lcmt_contact_results_for_viz format
+void cassie_sim_contact_forces(const cassie_sim_t *c, drake_lcmt_contact_results_for_viz* contact_results);
 
 // Applies an external force to a specified body.
 void cassie_sim_apply_force(cassie_sim_t *sim, double xfrc[6], int body);

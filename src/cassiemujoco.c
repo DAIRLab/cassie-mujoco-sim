@@ -30,6 +30,7 @@
 #include "cassie_core_sim.h"
 #include "state_output.h"
 #include "pd_input.h"
+#include "drake_lcmt_contact_results_for_viz.h"
 
 // Platform specific headers
 #ifdef _WIN32
@@ -697,6 +698,8 @@ static void cassie_sensor_data(cassie_sim_t *c)
                 &c->d->sensordata[23], 3);
     mju_copy_fp(c->cassie_out.pelvis.vectorNav.magneticField,
                 &c->d->sensordata[26], 3);
+
+    //TODO (yangwill) Transform angularVelocity to world frame
 }
 
 
@@ -773,10 +776,11 @@ bool cassie_mujoco_init(const char *file_input)
         mj_activate_fp(key_buf);
         // Load the model;
         const char* modelfile;
-        if ((modelfile = getenv("CASSIE_MODEL_PATH")) == NULL) {
-            printf("env variable doesn't exist\n");
-            modelfile = file_input;
-        }
+        // if ((modelfile = getenv("CASSIE_MODEL_PATH")) == NULL) {
+        //     printf("env variable doesn't exist\n");
+        //     modelfile = file_input;
+        // }
+        modelfile = file_input;
         printf("loading model file: %s\n", modelfile);
         char error[1000] = "Could not load XML model";
         initial_model = mj_loadXML_fp(modelfile, 0, error, 1000); 
@@ -872,10 +876,18 @@ cassie_sim_t *cassie_sim_init(const char* modelfile)
          -1.1997, 0, 1.4267, 0, -1.5244, 1.5244, -1.5968,
          -0.0045, 0, 0.4973, 0.9786, 0.00386, -0.01524, -0.2051,
          -1.1997, 0, 1.4267, 0, -1.5244, 1.5244, -1.5968};
+    // double qpos_init[] =
+    //     { 0.0045, 0, 0.4973, 
+    //      -1.1997, 0, 1.4267, 0, -1.5244, 1.5244, -1.5968,
+    //      -0.0045, 0, 0.4973,
+    //      -1.1997, 0, 1.4267, 0, -1.5244, 1.5244, -1.5968};
+    // double qpos_init[] =
+    //     { 0.0045, 0, 0.4973, -1.1997, 0, 1.4267, 0, -1.5244, -1.5968, 
+    //      -0.0045, 0, 0.4973, -1.1997, 0, 1.4267, 0, -1.5244, -1.5968};
     mju_copy_fp(&c->d->qpos[7], qpos_init, 28);
     mj_forward_fp(c->m, c->d);
 
-    print_inertia_matrix(c);
+    // print_inertia_matrix(c);
 
     // Intialize systems
     cassie_core_sim_setup(c->core);
@@ -1045,9 +1057,9 @@ void print_inertia_matrix(cassie_sim_t *c)
     double* pos = cassie_sim_qpos(c);
     mju_printMat_fp(pos, c->m->nq, 1);
 
+    printf("Inertia matrix: \n");
     double inertia[c->m->nv * c->m->nv];
     mj_fullM_fp(c->m, inertia, c->d->qM);
-    printf("Inertia matrix: ");
     mju_printMat_fp(inertia, c->m->nv, c->m->nv);
 
     double mass = mj_getTotalmass_fp(c->m);
@@ -1135,6 +1147,68 @@ void cassie_sim_foot_forces(const cassie_sim_t *c, double cfrc[12])
                 for (int j = 0; j < 3; ++j) cfrc[j+6] += force_global[j];
         }
     }
+}
+
+void cassie_sim_contact_forces(const cassie_sim_t *c, drake_lcmt_contact_results_for_viz* contact_info)
+{
+    double force_torque[6];
+    double force_global[3];
+
+    // drake_lcmt_point_pair_contact_info_for_viz point_pair_contact_info[c->d->ncon];
+    contact_info->num_hydroelastic_contacts = 0;
+    contact_info->hydroelastic_contacts = 0;
+    int n_contacts = 0;
+    bool is_foot = false;
+    for (int i = 0; i < c->d->ncon; ++i) {
+        // reverse space for body name
+        contact_info->point_pair_contact_info[i].body2_name = (char*) lcm_malloc(sizeof(char) * 20);
+        mju_zero_fp(force_global, 3);
+        // Check both bodies in the collision
+        int body1 = c->m->geom_bodyid[c->d->contact[i].geom1];
+        int body2 = c->m->geom_bodyid[c->d->contact[i].geom2];
+
+        // Left foot
+        if (body1 == left_foot_body_id || body2 == left_foot_body_id) {
+            // Get contact force in world coordinates
+            mj_contactForce_fp(c->m, c->d, i, force_torque);
+            mju_rotVecMatT_fp(force_global, force_torque,
+                             c->d->contact[i].frame);
+
+            // Add to total forces on foot
+            if (body1 == left_foot_body_id)
+                for (int j = 0; j < 3; ++j) force_global[j] = -force_global[j];
+            
+            strcpy(contact_info->point_pair_contact_info[n_contacts].body2_name, "toe_left(2)");
+            is_foot = true;
+        }
+        // Right foot
+        if (body1 == right_foot_body_id || body2 == right_foot_body_id) {
+            // Get contact force in world coordinates
+            mj_contactForce_fp(c->m, c->d, i, force_torque);
+            mju_rotVecMatT_fp(force_global, force_torque,
+                             c->d->contact[i].frame);
+
+            // Invert the forces if the first body is the foot
+            if (body1 == right_foot_body_id)
+                for (int j = 0; j < 3; ++j) force_global[j] = -force_global[j];
+            
+            strcpy(contact_info->point_pair_contact_info[n_contacts].body2_name, "toe_right(2)");
+            is_foot = true;
+        }
+
+        // record the foot forces
+        if(is_foot){
+            contact_info->point_pair_contact_info[n_contacts].body1_name = (char*) lcm_malloc(sizeof(char) * 20);
+            strcpy(contact_info->point_pair_contact_info[n_contacts].body1_name, "WorldBody(0)");
+            memcpy(contact_info->point_pair_contact_info[n_contacts].contact_point, c->d->contact[i].pos, sizeof(contact_info->point_pair_contact_info[i].contact_point));
+            memcpy(contact_info->point_pair_contact_info[n_contacts].contact_force, force_global, sizeof(contact_info->point_pair_contact_info[i].contact_force));
+            memcpy(contact_info->point_pair_contact_info[n_contacts].normal, c->d->contact[i].frame, sizeof(contact_info->point_pair_contact_info[i].normal));
+            n_contacts += 1;
+        }
+        is_foot = false;
+    }
+    // record the numbr of ground reaction forces
+    contact_info->num_point_pair_contacts = n_contacts;
 }
 
 void cassie_vis_foot_forces(const cassie_vis_t *c, double cfrc[12])
@@ -1923,12 +1997,6 @@ bool cassie_vis_draw(cassie_vis_t *v, cassie_sim_t *c)
     glfwSwapBuffers_fp(v->window);
     glfwPollEvents_fp();
 
-    double cfrc[12];
-    // cassie_sim_foot_forces(c, cfrc);
-    // printf("foot forces:\n");
-    // for (int i = 0; i < 12; i++) {
-    //     printf("%f, ", cfrc[i]);
-    // }
     return true;
 }
 
