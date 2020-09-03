@@ -28,6 +28,8 @@
 #include "dairlib_lcmt_cassie_out.h"
 #include "dairlib_lcmt_robot_output.h"
 #include "dairlib_lcmt_contact_mujoco.h"
+#include "drake_lcmt_contact_results_for_viz.h"
+#include "drake_lcmt_point_pair_contact_info_for_viz.h"
 #include "udp_lcm_translator.h"
 #include "pack_robot_out.h"
 
@@ -190,7 +192,7 @@ int main(int argc, char *argv[])
     remoteaddr.sin_port = htons(25001);
 
     // Create cassie simulation
-    const char modelfile[] = "../model/cassie.xml";
+    const char modelfile[] = "/home/yangwill/workspace/cassie-mujoco-sim/model/cassie.xml";
     // const char modelfile[] = "/home/yangwill/workspace/dairlib/examples/Cassie/urdf/cassie_v2.urdf";
     cassie_sim_t *sim = cassie_sim_init(modelfile);
     cassie_vis_t *vis;
@@ -236,11 +238,13 @@ int main(int argc, char *argv[])
     int qoffset = 0;
     int voffset = 0;
 
-    // Create contact_force lcm message
-    dairlib_lcmt_contact_mujoco cassie_mujoco_contact;
-    double contact_forces[12];
-    cassie_mujoco_contact.contact_forces = contact_forces;
-    cassie_mujoco_contact.num_contact_forces = 12;
+    // Initialize LCM contact message
+    drake_lcmt_contact_results_for_viz cassie_contact_drake;
+    drake_lcmt_point_pair_contact_info_for_viz contact_info[4];
+    cassie_contact_drake.num_point_pair_contacts = 4;
+    cassie_contact_drake.point_pair_contact_info = contact_info;
+    cassie_contact_drake.num_hydroelastic_contacts = 0;
+    cassie_contact_drake.hydroelastic_contacts = 0;
 
     if(!hold) {
         // Although this is different than the ordering of MBP, state receiver will rearrange accordingly
@@ -359,12 +363,12 @@ int main(int argc, char *argv[])
             case MODE_PD:
                 cassie_sim_step_pd(sim, &state_out, &pd_in);
                 pack_state_out_t(&state_out, data_out);
-                cassie_sim_foot_forces(sim, contact_forces);
+                cassie_sim_contact_forces(sim, &cassie_contact_drake);
               break;
             default:
                 cassie_sim_step(sim, &cassie_out, &cassie_user_in);
                 pack_cassie_out_t(&cassie_out, data_out);
-                cassie_sim_foot_forces(sim, contact_forces);
+                cassie_sim_contact_forces(sim, &cassie_contact_drake);
             }
 
             // print_inertia_matrix(sim);
@@ -408,11 +412,11 @@ int main(int argc, char *argv[])
                 pack_robot_out_vectors(&robot_output_message, sim, &cassie_out,
                     hold);
                 robot_output_message.utime = (int64_t) (time * 1.0e6);
-                cassie_mujoco_contact.utime = (int64_t) (time * 1.0e6);
+                cassie_contact_drake.timestamp = (int64_t) (time * 1.0e6);
                 dairlib_lcmt_robot_output_publish(lcm, "CASSIE_STATE_SIMULATION",
                         &robot_output_message);
-                dairlib_lcmt_contact_mujoco_publish(lcm, "CASSIE_CONTACT_MUJOCO",
-                                                         &cassie_mujoco_contact);
+                drake_lcmt_contact_results_for_viz_publish(lcm, "CASSIE_CONTACT_MUJOCO",
+                                                         &cassie_contact_drake);
             }
         }
 

@@ -887,7 +887,7 @@ cassie_sim_t *cassie_sim_init(const char* modelfile)
     mju_copy_fp(&c->d->qpos[7], qpos_init, 28);
     mj_forward_fp(c->m, c->d);
 
-    // print_inertia_matrix(c);
+    print_inertia_matrix(c);
 
     // Intialize systems
     cassie_core_sim_setup(c->core);
